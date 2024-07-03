@@ -4,6 +4,7 @@ import numpy as np
 import os.path as path
 import sqlite3
 import disnake
+from disnake.ext import commands
 
 # Get token from text file
 
@@ -49,6 +50,19 @@ class Shockwave(disnake.Client):
     async def on_guild_remove(ctx, guild):
         cursor.execute("""DELETE FROM servers WHERE guildId=?""", (guild.id,))
         mainDB.commit()
+
+command_sync_flags = commands.CommandSyncFlags.default()
+command_sync_flags.sync_commands_debug = True
+
+bot = commands.Bot(command_prefix='.', intents=intents, command_sync_flags=command_sync_flags)
+
+@bot.slash_command(name='ping', description="Responds with a pong!")
+async def ping(ctx : disnake.ApplicationCommandInteraction):
+    await ctx.response.send_message("Pong!")
+
+@bot.command()
+async def test(ctx):
+    await ctx.send("Test")
 
 client = Shockwave()
 client.run(token)
