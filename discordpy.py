@@ -60,7 +60,6 @@ async def on_ready():
     )
     print("Command: Shockwave")
 
-
 # Helper Functions
 
 async def movefunc(ctx):
