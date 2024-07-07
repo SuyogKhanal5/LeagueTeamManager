@@ -5,6 +5,7 @@ class Team:
         self.name = None
         self.players = []
         self.size = 0
+        self.voice_channel = None
 
     def add_player(self, player: discord.Member) -> None:
         self.players.append(player)
@@ -21,6 +22,9 @@ class Team:
     def set_winner(self, winner: bool) -> None:
         self.winner = winner
 
+    def set_voice_channel(self, voice_channel: discord.VoiceChannel) -> None:
+        self.voice_channel = voice_channel
+
     def get_name(self) -> str:
         return self.name
 
@@ -32,3 +36,6 @@ class Team:
 
     def get_winner(self) -> bool:
         return self.winner
+    
+    def get_voice_channel(self) -> discord.VoiceChannel:
+        return self.voice_channel
