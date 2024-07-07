@@ -467,16 +467,6 @@ async def setTeamSize(ctx, *, sizechange : int):
 
 
 @tree.command(
-    name="full-random",
-    description="Randomizes teams and roles",
-    guild=discord.Object(id=526081127643873280)
-)
-async def fullRandom(ctx):
-    await both(ctx)
-    await printEmbed(ctx)@client.command()
-
-
-@tree.command(
     name="set-team-channels",
     description="Set the team channels",
     guild=discord.Object(id=526081127643873280)
@@ -504,34 +494,40 @@ async def help(ctx):
 
 
 @tree.command(
-    name="full-random-all",
+    name="random",
     description="Randomizes teams, roles, sets team channels, and moves players to their respective channels",
     guild=discord.Object(id=526081127643873280)
 )
-async def fullRandomAll(ctx, *, team1 : str, team2 : str):
-    await both(ctx)
-    await all(ctx, team1 + " " + team2)
-
-
-@tree.command(
-    name="random-teams",
-    description="Randomizes teams",
-    guild=discord.Object(id=526081127643873280)
+@tree.option(
+    "roles", 
+    description="Whether or not to randomize roles",
+    required=False,
+    default='True'
 )
-async def randomTeams(ctx):
-    await randomizeTeamHelper(ctx)
-    await printEmbed(ctx)
-
-
-@tree.command(
-    name="random-all",
-    description="Randomizes teams and moves players to their respective channels",
-    guild=discord.Object(id=526081127643873280)
+@tree.option(
+    "team1", 
+    description="Name of first team",
+    required=True
 )
-async def randomAll(ctx, *, team1 : str, team2 : str):
-    await randomizeTeamHelper(ctx)
-    await all(ctx, team1 + " " + team2)
-
+@tree.option(
+    "team2", 
+    description="Name of second team",
+    required=True
+)
+@tree.option(
+    "move",
+    description="Whether or not to move players to their respective channels",
+    required=False,
+    default='True'
+)
+async def fullRandom(ctx, roles : str, team1 : str, team2 : str, moveVar : str):
+    if roles == 'True':
+        await both(ctx)
+    else:
+        await randomizeTeamHelper(ctx)
+    
+    if moveVar:
+        await move(ctx)
 
 @tree.command(
     name="return",
