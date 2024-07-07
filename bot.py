@@ -56,13 +56,6 @@ async def on_guild_remove(ctx):
     cursor.execute("""DELETE FROM servers WHERE guildId=?""", (ctx.id,))
     mainDB.commit()
 
-@tree.command(
-    name="ping",
-    description="Responds with a pong!",
-    guild=discord.Object(id=526081127643873280),
-)
-async def ping(interaction: discord.Interaction):    
-    await interaction.response.send_message("pong")
 
 # Helper Functions
 
@@ -494,33 +487,11 @@ async def help(ctx):
 
 
 @tree.command(
-    name="full-random",
+    name="make-teams",
     description="Randomizes teams, roles, sets team channels, and moves players to their respective channels",
     guild=discord.Object(id=526081127643873280)
 )
-# @app_commands.option(
-#     "roles", 
-#     description="Whether or not to randomize roles",
-#     required=False,
-#     default='True'
-# )
-# @app_commands.option(
-#     "team1", 
-#     description="Name of first team",
-#     required=True
-# )
-# @app_commands.option(
-#     "team2", 
-#     description="Name of second team",
-#     required=True
-# )
-# @app_commands.option(
-#     "move",
-#     description="Whether or not to move players to their respective channels",
-#     required=False,
-#     default='True'
-# )
-async def fullRandom(ctx, roles : str, team1 : str, team2 : str, movevar : str):
+async def fullRandom(ctx, roles : bool = False, movevar : bool = True):
     if roles == 'True':
         await both(ctx)
     else:
@@ -531,42 +502,6 @@ async def fullRandom(ctx, roles : str, team1 : str, team2 : str, movevar : str):
 
 @tree.command(
     name="return",
-    description="Return players to the original channel",
-    guild=discord.Object(id=526081127643873280)
-)
-async def returnTeams(ctx):
-    og = get(ctx.guild.id, "original_channel")
-    original_channel = discord.utils.get(ctx.guild.channels, name=og)
-    using_captains = get(ctx.guild.id, "using_captains")
-    ids = get(ctx.guild.id, "ids")
-    team1ids = get(ctx.guild.id, "team1ids")
-    team2ids = get(ctx.guild.id, "team2ids")
-
-    if original_channel == "":
-        await ctx.response.send_message(
-            'You have not been seperated into team voice channels! Use ".move" first.'
-        )
-    else:
-        if using_captains:
-            for i in team1ids:
-                member = ctx.guild.get_member(i)
-                await member.move_to(original_channel)
-            for i in team2ids:
-                member = ctx.guild.get_member(i)
-                await member.move_to(original_channel)
-        else:
-            for i in range(0, len(team1ids) + len(team2ids)):
-                id = ids[i]
-                if id is None:
-                    continue
-                else:
-                    member = ctx.guild.get_member(id)
-                    if member is not None and member.voice:
-                        await member.move_to(original_channel)
-
-
-@tree.command(
-    name="return-all",
     description="Return all members (including spectators) to the original channel",
     guild=discord.Object(id=526081127643873280)
 )
@@ -596,20 +531,30 @@ async def returnAll(ctx):
     description="Start captain draft",
     guild=discord.Object(id=526081127643873280)
 )
-async def captains(ctx, captain_1: discord.Member, captain_2: discord.Member):
-    await captainsHelper(ctx, captain_1, captain_2)
+async def captains(ctx, captain_1: discord.Member = None, captain_2: discord.Member = None, random: bool = False):
+    if len(ctx.message.author.voice.channel.members) < 2:
+        ctx.response.send_message("Not enough players in the voice channel!")
+    else:
+        if random:
+            players = []
+            for player in ctx.message.author.voice.channel.members:
+                players.append(player.name)
 
+            update(ctx.guild.id, "players", players)
 
-@tree.command(
-    name="captains-all",
-    description="Start captain draft, set team channels, and move players to their respective channels",
-    guild=discord.Object(id=526081127643873280)
-)
-async def captainsAll(
-    ctx, captain_1: discord.Member, captain_2: discord.Member, *, team1 : str, team2 : str
-):
-    await setTeamHelper(ctx, team1 + " " + team2)
-    await captainsHelper(ctx, captain_1, captain_2)
+            captain1 = await getRandomMember(ctx)
+            captain2 = None
+
+            while captain2 == None:
+                possible = await getRandomMember(ctx)
+
+                if possible != captain1: ### changed from or and < in case this doesn't work as intended 
+                    captain2 = possible
+
+        if captain_1 == None or captain_2 == None:
+            ctx.response.send_message("Mention two team captains!")
+
+        await captainsHelper(ctx, captain_1, captain_2)
 
 
 @tree.command(
@@ -617,34 +562,26 @@ async def captainsAll(
     description="Choose a player for your team (captains only)",
     guild=discord.Object(id=526081127643873280)
 )
-async def choose(ctx, member: discord.Member):
-    await chooseFunc(ctx, member)
+async def choose(ctx, member: discord.Member = None, random: bool = False):
+    if random:
+        await chooseRandomMember(ctx)
+    else:
+        await chooseFunc(ctx, member)
 
 
 @tree.command(
     name="clear",
-    description="Clear all data",
+    description="Clear data",
     guild=discord.Object(id=526081127643873280)
 )
-async def clearAll(ctx):
-    clearTeamsHelper(ctx)
-
-    update(ctx.guild.id, "channel1", None)
-    update(ctx.guild.id, "channel2", None)
-
-    await ctx.response.send_message("Cleared!")
-
-
-@tree.command(
-    name="clear-teams",
-    description="Clear team data",
-    guild=discord.Object(id=526081127643873280)
-)
-async def clearTeams(ctx):
+async def clearAll(ctx, clear_channels : bool = False):
     await clearTeamsHelper(ctx)
-
+    
+    if clear_channels:
+        update(ctx.guild.id, "channel1", None)
+        update(ctx.guild.id, "channel2", None)
+    
     await ctx.response.send_message("Cleared!")
-
 
 @tree.command(
     name="notify",
@@ -665,61 +602,6 @@ async def notify(ctx, member: discord.Member):
     )
     await channel.response.send_message(content)
     await ctx.response.send_message("Sent an invite for the " + str(team_size * 2) + " man!")
-
-
-@tree.command(
-    name="random-captains",
-    description="Randomly select two captains",
-    guild=discord.Object(id=526081127643873280)
-)
-async def randomCaptains(ctx):
-    players = []
-    for player in ctx.message.author.voice.channel.members:
-        players.append(player.name)
-
-    update(ctx.guild.id, "players", players)
-
-    captain1 = await getRandomMember(ctx)
-    captain2 = None
-
-    while captain2 == None:
-        possible = await getRandomMember(ctx)
-
-        if possible != captain1 or len(ctx.message.author.voice.channel.members) < 2:
-            captain2 = possible
-
-    await captainsHelper(ctx, captain1, captain2)
-
-
-@tree.command(
-    name="choose-random",
-    description="Randomly select a player for your team",
-    guild=discord.Object(id=526081127643873280)
-)
-async def chooseRandom(ctx):
-    players = get(ctx.guild.id, "players")
-    captain1id = get(ctx.guild.id, "captain1")
-    captain2id = get(ctx.guild.id, "captain2")
-
-    captain1 = discord.utils.get(ctx.guild.members, id=captain1id)
-    captain2 = discord.utils.get(ctx.guild.members, id=captain2id)
-
-    channel = ctx.message.author.voice.channel
-    player_members = []
-
-    if len(players) == 0:
-        await ctx.response.send_message("All players have been selected")
-
-    for player in channel.members:
-        if (
-            player.name != captain1.name
-            and player.name != captain2.name
-            and players.__contains__(player.name) == True
-        ):
-            player_members.append(player)
-
-    await chooseRandomMember(ctx)
-
 
 @tree.command(
     name="roll",
