@@ -498,28 +498,28 @@ async def help(ctx):
     description="Randomizes teams, roles, sets team channels, and moves players to their respective channels",
     guild=discord.Object(id=526081127643873280)
 )
-@tree.option(
-    "roles", 
-    description="Whether or not to randomize roles",
-    required=False,
-    default='True'
-)
-@tree.option(
-    "team1", 
-    description="Name of first team",
-    required=True
-)
-@tree.option(
-    "team2", 
-    description="Name of second team",
-    required=True
-)
-@tree.option(
-    "move",
-    description="Whether or not to move players to their respective channels",
-    required=False,
-    default='True'
-)
+# @app_commands.option(
+#     "roles", 
+#     description="Whether or not to randomize roles",
+#     required=False,
+#     default='True'
+# )
+# @app_commands.option(
+#     "team1", 
+#     description="Name of first team",
+#     required=True
+# )
+# @app_commands.option(
+#     "team2", 
+#     description="Name of second team",
+#     required=True
+# )
+# @app_commands.option(
+#     "move",
+#     description="Whether or not to move players to their respective channels",
+#     required=False,
+#     default='True'
+# )
 async def fullRandom(ctx, roles : str, team1 : str, team2 : str, moveVar : str):
     if roles == 'True':
         await both(ctx)
