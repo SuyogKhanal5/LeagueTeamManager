@@ -7,49 +7,51 @@ import discord
 from discord import app_commands
 
 # Get token from text file
-
 token = ""
 
 with open("token.txt") as f:
     token = f.readline()
 
 # Connect to Database
-
-dataFolder = "data/guildData/serverInfo/"  # CHANGE TO / IF ON WINDOWS MACHINE!!!!!!!!!!
+# Change to "/" if on Windows
+dataFolder = "data/guildData/serverInfo/"
 dbpath = dataFolder + "main.db"
-
-exist = path.isfile(dbpath)
 
 mainDB = sqlite3.connect(dbpath)
 cursor = mainDB.cursor()
 
-if not exist:
+# if database doesn't already exist, create it
+if not path.isfile(dbpath):
     cursor.execute("CREATE TABLE servers(guildId, serverName, original_channel, team1, team2, players, channel1, channel2, captain1, captain2, mode, turn, team_size, tournament, elo)")
 
 # Hash Map
+roles = {
+    0: "Top - ",
+    1: "Jungle - ",
+    2: "Mid - ",
+    3: "Bottom - ",
+    4: "Support - "
+}
 
-roles = {0: "Top - ", 1: "Jungle - ", 2: "Mid - ", 3: "Bottom - ", 4: "Support - "}
-
-# Set Intents
-
-intents = discord.Intents.default()
-intents.typing = False
-intents.presences = False
-intents.guilds = True
-
+# create client object
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
+
 @client.event
 async def on_ready():
+    # TODO: remove id when deploying. current has banter server ID
     await tree.sync(guild=discord.Object(526081127643873280))
     print('Command: Shockwave')
 
+
 @client.event
 async def on_guild_join(ctx):
-    cursor.execute("INSERT INTO servers VALUES(?, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)", (ctx.id, ctx.name))
+    cursor.execute(
+        "INSERT INTO servers VALUES(?, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)", (ctx.id, ctx.name))
     mainDB.commit()
+
 
 @client.event
 async def on_guild_remove(ctx):
@@ -59,14 +61,21 @@ async def on_guild_remove(ctx):
 
 # Helper Functions
 
+# SQL get template function
 async def get(guild_id, column):
-    cursor.execute("SELECT " + column + " FROM servers WHERE guildId=?", (guild_id,))
+    cursor.execute("SELECT " + column +
+                   " FROM servers WHERE guildId=?", (guild_id,))
     return cursor.fetchone()[0]
 
+
+# SQL update template function
 async def update(guild_id, column, value):
-    cursor.execute("UPDATE servers SET " + column + "=? WHERE guildId=?", (value, guild_id))
+    cursor.execute("UPDATE servers SET " + column +
+                   "=? WHERE guildId=?", (value, guild_id))
     mainDB.commit()
 
+
+# move players into their corresponding team channels
 async def movefunc(ctx):
     channel1name = get(ctx.guild.id, "channel1")
     channel2name = get(ctx.guild.id, "channel2")
@@ -79,7 +88,7 @@ async def movefunc(ctx):
     channel1 = discord.utils.get(ctx.guild.channels, name=channel1name)
     channel2 = discord.utils.get(ctx.guild.channels, name=channel2name)
 
-    if channel1 != None or channel2 != None:
+    if channel1 is not None and channel2 is not None:
         for i in team1:
             member = discord.utils.get(ctx.guild.members, name=i)
             await member.move_to(channel1)
@@ -91,6 +100,8 @@ async def movefunc(ctx):
         await ctx.response.send_message('Team Channels Not Set! Use ".setTeams" to set teams.')
 
 
+# TODO: what if there are more players in the channel than team sizes?
+# or if number of members if odd?
 async def randomizeTeamHelper(ctx):
     await clearTeamsHelper(ctx)
 
@@ -128,6 +139,8 @@ async def randomizeTeamHelper(ctx):
             result2 += m[i].name
             result2 += "\n"
 
+    # TODO: remove names, ids, result*, teamids
+    # how are these handled now?
     update(ctx.guild.id, "names", names)
     update(ctx.guild.id, "ids", ids)
     update(ctx.guild.id, "result1", result1)
@@ -138,7 +151,9 @@ async def randomizeTeamHelper(ctx):
     update(ctx.guild.id, "teamids", team2ids)
 
 
+# prints teams in discord channel
 async def printEmbed(ctx, channel=None):
+    # TODO: remove result*, playerString
     result1 = get(ctx.guild.id, "result1")
     result2 = get(ctx.guild.id, "result2")
     captain1id = get(ctx.guild.id, "captain1")
@@ -158,20 +173,22 @@ async def printEmbed(ctx, channel=None):
     await ctx.response.send_message(embed=team1_embed)
     await ctx.response.send_message(embed=team2_embed)
 
-    if channel != None:
+    if channel is not None:
         playerString = ""
         for player in channel.members:
+            # TODO: remove result1 and result2
             if (
                 player.name != captain1.name
                 and player.name != captain2.name
-                and result1.__contains__(player.name) == False
-                and result2.__contains__(player.name) == False
+                and player.name in result1
+                and player.name in result2
             ):
-                if players.__contains__(player.name) == False:
+                if player.name not in players:
                     players.append(player.name)
                 playerString += player.name + "\n"
 
         update(ctx.guild.id, "players", players)
+        # TODO: remove playerString
         update(ctx.guild.id, "playerString", playerString)
 
         players_embed = discord.Embed(
@@ -193,7 +210,6 @@ async def printEmbed(ctx, channel=None):
                 playerString += player.name + "\n"
 
         update(ctx.guild.id, "players", players)
-        update(ctx.guild.id, "players", players)
 
         players_embed = discord.Embed(
             title="PLAYERS", description=playerString, color=discord.Color.dark_purple()
@@ -201,6 +217,8 @@ async def printEmbed(ctx, channel=None):
         await ctx.response.send_message(embed=players_embed)
 
 
+# sets channels for teams
+# TODO: change teams to expect array of two team names
 async def setTeamHelper(ctx, teams="Team-1 Team-2"):
     teamsList = teams.split()
 
@@ -223,6 +241,9 @@ async def setTeamHelper(ctx, teams="Team-1 Team-2"):
 
     await ctx.response.send_message("Channels set!")
 
+# TODO: rename this wtf
+# randomizes teams and player roles
+
 
 async def both(ctx):
     await randomizeTeamHelper(ctx)
@@ -241,6 +262,8 @@ async def randomRoleHelper(ctx):
     random.shuffle(team1)
     random.shuffle(team2)
 
+    # TODO: currently hardcoded but should add a way to create team of any size
+    # e.g. based on game, different hashmaps for role
     for i in range(10):
         if i < 5:
             result1 += roles.get(i % 5) + str(team1[i % 5]) + "\n"
@@ -251,9 +274,11 @@ async def randomRoleHelper(ctx):
     update(ctx.guild.id, "result2", result2)
 
 
+# chooses captains for each team at random
 async def captainsHelper(ctx, captain_1, captain_2):
     await clearTeamsHelper(ctx)
 
+    # TODO: remove result1, result2, using_captains_ and original_channel
     result1 = ""
     result2 = ""
     team1ids = []
@@ -264,14 +289,16 @@ async def captainsHelper(ctx, captain_1, captain_2):
     update(ctx.guild.id, "captain1", captain_1.id)
     update(ctx.guild.id, "captain2", captain_2.id)
     update(ctx.guild.id, "using_captains", True)
-    update(ctx.guild.id, "original_channel", str(ctx.message.author.voice.channel))
+    update(ctx.guild.id, "original_channel",
+           str(ctx.message.author.voice.channel))
     original_channel = get(ctx.guild.id, "original_channel")
 
-    if captain_1 == None or captain_2 == None:
+    if captain_1 is None or captain_2 is None:
         await ctx.response.send_message("Mention two team captains!")
     elif captain_1 == captain_2:
         await ctx.response.send_message("Mention two different people!")
     else:
+        # TODO: why do we use captain_1? seems useless asf
         captain1 = captain_1
         result1 += str(captain1.name)
         update(ctx.guild.id, "result1", result1)
@@ -299,7 +326,9 @@ async def captainsHelper(ctx, captain_1, captain_2):
         )
 
 
+# function for captain to choose a specific team member
 async def chooseFunc(ctx, member):
+    # TODO: remove drafted, captainsNum
     drafted = get(ctx.guild.id, "drafted")
     team_size = get(ctx.guild.id, "team_size")
     captainNum = get(ctx.guild.id, "captainNum")
@@ -309,6 +338,7 @@ async def chooseFunc(ctx, member):
     captain1 = discord.utils.get(ctx.guild.members, id=captain1id)
     captain2 = discord.utils.get(ctx.guild.members, id=captain2id)
 
+    # TODO: clean this up. maybe use guard clauses instead?
     if drafted < (team_size * 2):
         if captainNum == 1 and ctx.message.author.id == captain1.id:
             await chooseHelper(ctx, member, 1)
@@ -326,6 +356,7 @@ async def chooseFunc(ctx, member):
                 await ctx.response.send_message("Only team captains can use this command!")
 
 
+# choose random player from all remaining players
 async def chooseRandomMember(ctx):
     randomMember = await getRandomMember(ctx)
     await chooseFunc(ctx, randomMember)
@@ -337,15 +368,21 @@ async def getRandomMember(ctx):
     player_members = []
 
     for player in players:
-        player_members.append(discord.utils.get(ctx.guild.members, name=player))
+        player_members.append(discord.utils.get(
+            ctx.guild.members, name=player))
 
+    # TODO: instead, choose a random index in [0, arr_size - 1] and use that.
+    # no need to shuffle
     m = np.array(player_members)
     np.random.shuffle(m)
 
     return m[0]
 
 
+# helper fn for choosing team members from players that haven't been chosen
+# TODO: using capNum sounds messy. why not just use their id?
 async def chooseHelper(ctx, member, capNum):
+    # TODO: remove result1, result2
     captain1id = get(ctx.guild.id, "captain1")
     captain2id = get(ctx.guild.id, "captain2")
     players = get(ctx.guild.id, "players")
@@ -359,12 +396,13 @@ async def chooseHelper(ctx, member, capNum):
     captain2 = discord.utils.get(ctx.guild.members, id=captain2id)
 
     channel = ctx.message.author.voice.channel
+    # TODO: what is the purpose of switch?
     switch = True
 
     if (
-        team1.__contains__(member) == False
-        and team2.__contains__(member) == False
-        and players.__contains__(member.name) == True
+        member not in team1
+        and member not in team2
+        and member.name in players
     ):
         if capNum == 1:
             result1 += "\n" + member.name
@@ -385,6 +423,7 @@ async def chooseHelper(ctx, member, capNum):
 
         await printEmbed(ctx, channel)
     else:
+        # TODO: cleanup this if-else ladder
         switch = False
         await ctx.response.send_message(
             "Player has already been selected or does not exist in the player list."
@@ -419,15 +458,19 @@ async def chooseHelper(ctx, member, capNum):
             )
 
 
+# TODO: RENAME THIS TO SOMETHING REAL ????
+# sets up teams and moves them into respective channels
 async def all(ctx, teams):
     await printEmbed(ctx)
     await setTeamHelper(ctx, teams)
     await movefunc(ctx)
 
 
+# clears all current teams
 async def clearTeamsHelper(ctx):
     guild_id = ctx.guild.id
 
+    # TODO: remove unused columns
     update(guild_id, "original_channel", "")
     update(guild_id, "playerString", "")
     update(guild_id, "result1", "")
@@ -446,6 +489,7 @@ async def clearTeamsHelper(ctx):
     update(guild_id, "using_captains", False)
 
 # Commands
+# TODO: change ids when putting into production
 
 
 @tree.command(
@@ -453,9 +497,8 @@ async def clearTeamsHelper(ctx):
     description="Set the size of the teams",
     guild=discord.Object(id=526081127643873280)
 )
-async def setTeamSize(ctx, *, sizechange : int):
+async def setTeamSize(ctx, *, sizechange: int):
     update(ctx.guild.id, "team_size", sizechange)
-
     await ctx.response.send_message("Set team size!")
 
 
@@ -464,7 +507,7 @@ async def setTeamSize(ctx, *, sizechange : int):
     description="Set the team channels",
     guild=discord.Object(id=526081127643873280)
 )
-async def setTeamChannels(ctx, *, team1 : str, team2 : str):
+async def setTeamChannels(ctx, *, team1: str, team2: str):
     await setTeamHelper(ctx, team1 + " " + team2)
 
 
@@ -477,6 +520,7 @@ async def move(ctx):
     await movefunc(ctx)
 
 
+# TODO: update website to current shockwave website
 @tree.command(
     name="help",
     description="Get a list of commands",
@@ -486,19 +530,21 @@ async def help(ctx):
     await ctx.response.send_message("Visit WEBSITE NOT READY for a full list of commands")
 
 
+# TODO: rename fullRandom to makeTeams
 @tree.command(
     name="make-teams",
     description="Randomizes teams, roles, sets team channels, and moves players to their respective channels",
     guild=discord.Object(id=526081127643873280)
 )
-async def fullRandom(ctx, roles : bool = False, movevar : bool = True):
+async def fullRandom(ctx, roles: bool = False, movevar: bool = True):
     if roles == 'True':
         await both(ctx)
     else:
         await randomizeTeamHelper(ctx)
-    
+
     if movevar:
         await move(ctx)
+
 
 @tree.command(
     name="return",
@@ -542,16 +588,18 @@ async def captains(ctx, captain_1: discord.Member = None, captain_2: discord.Mem
 
             update(ctx.guild.id, "players", players)
 
+            # randomly choose captains
             captain1 = await getRandomMember(ctx)
-            captain2 = None
+            while captain1 is None:
+                captain1 = await getRandomMember(ctx)
 
-            while captain2 == None:
-                possible = await getRandomMember(ctx)
+            # make sure captain1 and captain2 are different
+            captain2 = await getRandomMember(ctx)
+            while captain2 is None and captain2 == captain1:
+                captain2 = await getRandomMember(ctx)
 
-                if possible != captain1: ### changed from or and < in case this doesn't work as intended 
-                    captain2 = possible
-
-        if captain_1 == None or captain_2 == None:
+        # TODO: given our current code, is this check needed?
+        if captain1 is None or captain_2 is None:
             ctx.response.send_message("Mention two team captains!")
 
         await captainsHelper(ctx, captain_1, captain_2)
@@ -574,14 +622,15 @@ async def choose(ctx, member: discord.Member = None, random: bool = False):
     description="Clear data",
     guild=discord.Object(id=526081127643873280)
 )
-async def clearAll(ctx, clear_channels : bool = False):
+async def clearAll(ctx, clear_channels: bool = False):
     await clearTeamsHelper(ctx)
-    
+
     if clear_channels:
         update(ctx.guild.id, "channel1", None)
         update(ctx.guild.id, "channel2", None)
-    
+
     await ctx.response.send_message("Cleared!")
+
 
 @tree.command(
     name="notify",
@@ -603,12 +652,13 @@ async def notify(ctx, member: discord.Member):
     await channel.response.send_message(content)
     await ctx.response.send_message("Sent an invite for the " + str(team_size * 2) + " man!")
 
+
 @tree.command(
     name="roll",
     description="Roll a number between 1 and the number you provide",
     guild=discord.Object(id=526081127643873280)
 )
-async def roll(ctx, *, num : int):
+async def roll(ctx, *, num: int):
     if int(num) > 1:
         rand = random.randint(1, int(num))
         await ctx.response.send_message("You rolled " + str(rand))
@@ -625,4 +675,6 @@ async def randomizeRoles(ctx):
     await randomRoleHelper(ctx)
     await printEmbed(ctx)
 
+# TODO: move this somewhere else??
+# or move all the setup code at the start to a main function here
 client.run(token)
