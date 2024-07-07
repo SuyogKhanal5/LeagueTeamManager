@@ -494,7 +494,7 @@ async def help(ctx):
 
 
 @tree.command(
-    name="random",
+    name="full-random",
     description="Randomizes teams, roles, sets team channels, and moves players to their respective channels",
     guild=discord.Object(id=526081127643873280)
 )
@@ -520,13 +520,13 @@ async def help(ctx):
 #     required=False,
 #     default='True'
 # )
-async def fullRandom(ctx, roles : str, team1 : str, team2 : str, moveVar : str):
+async def fullRandom(ctx, roles : str, team1 : str, team2 : str, movevar : str):
     if roles == 'True':
         await both(ctx)
     else:
         await randomizeTeamHelper(ctx)
     
-    if moveVar:
+    if movevar:
         await move(ctx)
 
 @tree.command(
