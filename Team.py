@@ -2,6 +2,7 @@ import discord
 
 class Team:
     def __init__(self) -> None:
+        self.id = None
         self.name = None
         self.players = []
         self.size = 0
@@ -24,6 +25,12 @@ class Team:
 
     def set_voice_channel(self, voice_channel: discord.VoiceChannel) -> None:
         self.voice_channel = voice_channel
+
+    def set_id(self, id: int) -> None:
+        self.id = id
+
+    def get_id(self) -> int:
+        return self.id 
 
     def get_name(self) -> str:
         return self.name
