@@ -7,12 +7,15 @@ class Team:
         self.players = []
         self.size = 0
         self.voice_channel = None
+        self.captain = None
 
     def add_player(self, player: discord.Member) -> None:
         self.players.append(player)
+        self.size += 1
 
     def remove_player(self, player: discord.Member) -> None:
         self.players.remove(player)
+        self.size -= 1
 
     def set_name(self, name: str) -> None:
         self.name = name
@@ -25,6 +28,9 @@ class Team:
 
     def set_voice_channel(self, voice_channel: discord.VoiceChannel) -> None:
         self.voice_channel = voice_channel
+
+    def set_captain(self, captain: discord.Member) -> None:
+        self.captain = captain
 
     def set_id(self, id: int) -> None:
         self.id = id
@@ -46,3 +52,20 @@ class Team:
     
     def get_voice_channel(self) -> discord.VoiceChannel:
         return self.voice_channel
+    
+    def get_captain(self) -> discord.Member:
+        return self.captain
+    
+    def get_size(self) -> int:
+        return self.size
+
+class Match:
+    def __init__(self) -> None:
+        self.team1 = None
+        self.team2 = None
+        self.finished = False
+        self.winner = None
+
+class Tournament():
+    def __init__(self) -> None:
+        pass

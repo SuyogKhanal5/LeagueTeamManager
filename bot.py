@@ -5,6 +5,9 @@ import os.path as path
 import sqlite3
 import discord
 from discord import app_commands
+import TourneyClasses
+from TourneyClasses import Team, Tournament, Match
+import pickle
 
 # Get token from text file
 token = ""
@@ -13,7 +16,6 @@ with open("token.txt") as f:
     token = f.readline()
 
 # Connect to Database
-# Change to "/" if on Windows
 dataFolder = "data/guildData/serverInfo/"
 dbpath = dataFolder + "main.db"
 
@@ -22,7 +24,7 @@ cursor = mainDB.cursor()
 
 # if database doesn't already exist, create it
 if not path.isfile(dbpath):
-    cursor.execute("CREATE TABLE servers(guildId, serverName, original_channel, team1, team2, players, channel1, channel2, captain1, captain2, mode, turn, team_size, tournament, elo)")
+    cursor.execute("CREATE TABLE servers(guildId, serverName, original_channel, team1, team2, players, channel1, channel2, mode, turn, team_size, tournament, elo)")
 
 # Hash Map
 roles = {
@@ -33,7 +35,7 @@ roles = {
     4: "Support - "
 }
 
-# create client object
+# create client object and slash commands
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
@@ -41,7 +43,7 @@ tree = app_commands.CommandTree(client)
 
 @client.event
 async def on_ready():
-    # TODO: remove id when deploying. current has banter server ID
+    # TODO: remove id when deploying. current has banter server ID (also do for all commands)
     await tree.sync(guild=discord.Object(526081127643873280))
     print('Command: Shockwave')
 
@@ -49,7 +51,7 @@ async def on_ready():
 @client.event
 async def on_guild_join(ctx):
     cursor.execute(
-        "INSERT INTO servers VALUES(?, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)", (ctx.id, ctx.name))
+        "INSERT INTO servers VALUES(?, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)", (ctx.id, ctx.name))
     mainDB.commit()
 
 
@@ -106,14 +108,8 @@ async def randomizeTeamHelper(ctx):
     await clearTeamsHelper(ctx)
 
     members = []
-    names = []
-    ids = []
-    team1 = []
-    team2 = []
-    team1ids = []
-    team2ids = []
-    result1 = ""
-    result2 = ""
+    team1 = Team()
+    team2 = Team()
 
     channel = ctx.message.author.voice.channel
 
@@ -123,39 +119,36 @@ async def randomizeTeamHelper(ctx):
     m = np.array(members)
     np.random.shuffle(m)
 
-    for i in m:
-        names.append(i.name)
-        ids.append(i.id)
-
     for i in range(len(members)):
         if i < len(members) / 2:
-            team1.append(m[i].name)
-            team1ids.append(m[i].id)
-            result1 += m[i].name
-            result1 += "\n"
+            team1.add_player(m[i])
         else:
-            team2.append(m[i].name)
-            team2ids.append(m[i].id)
-            result2 += m[i].name
-            result2 += "\n"
+            team2.add_player(m[i].name)
+
+    # seriialize both team objs
+
+
+
+
 
     # TODO: remove names, ids, result*, teamids
     # how are these handled now?
-    update(ctx.guild.id, "names", names)
-    update(ctx.guild.id, "ids", ids)
-    update(ctx.guild.id, "result1", result1)
-    update(ctx.guild.id, "result2", result2)
     update(ctx.guild.id, "team1", team1)
     update(ctx.guild.id, "team2", team2)
-    update(ctx.guild.id, "teamids", team1ids)
-    update(ctx.guild.id, "teamids", team2ids)
 
+
+# TODO: add roles parameter
+async def makeEmbedString(team : Team):
+    for player in team.players:
+        teamString += player.name + "\n"
+
+    return teamString
 
 # prints teams in discord channel
-async def printEmbed(ctx, channel=None):
+async def printEmbed(ctx, team1 : Team = None, team2 : Team = None):
     # TODO: remove result*, playerString
-    result1 = get(ctx.guild.id, "result1")
-    result2 = get(ctx.guild.id, "result2")
+    team1_embedString = makeEmbedString(team1)
+    team2_embedString = makeEmbedString(team2)
     captain1id = get(ctx.guild.id, "captain1")
     captain2id = get(ctx.guild.id, "captain2")
     captain1 = discord.utils.get(ctx.guild.members, id=captain1id)
@@ -164,10 +157,10 @@ async def printEmbed(ctx, channel=None):
     players = get(ctx.guild.id, "players")
 
     team1_embed = discord.Embed(
-        title="TEAM 1", description=result1, color=discord.Color.blue()
+        title="TEAM 1", description=team1_embedString, color=discord.Color.blue()
     )
     team2_embed = discord.Embed(
-        title="TEAM 2", description=result2, color=discord.Color.red()
+        title="TEAM 2", description=team2_embedString, color=discord.Color.red()
     )
 
     await ctx.response.send_message(embed=team1_embed)
@@ -383,8 +376,8 @@ async def getRandomMember(ctx):
 # TODO: using capNum sounds messy. why not just use their id?
 async def chooseHelper(ctx, member, capNum):
     # TODO: remove result1, result2
-    captain1id = get(ctx.guild.id, "captain1")
-    captain2id = get(ctx.guild.id, "captain2")
+    captain1 = get(ctx.guild.id, "captain1")
+    captain2 = get(ctx.guild.id, "captain2")
     players = get(ctx.guild.id, "players")
     team1 = get(ctx.guild.id, "team1")
     team2 = get(ctx.guild.id, "team2")
@@ -472,21 +465,12 @@ async def clearTeamsHelper(ctx):
 
     # TODO: remove unused columns
     update(guild_id, "original_channel", "")
-    update(guild_id, "playerString", "")
-    update(guild_id, "result1", "")
-    update(guild_id, "result2", "")
-    update(guild_id, "captainNum", 1)
-    update(guild_id, "players", [])
+    update(guild_id, "team1", "")
+    update(guild_id, "team2", "")
+    update(guild_id, "players", "")
     update(guild_id, "team_size", 5)
-    update(guild_id, "team1", [])
-    update(guild_id, "team2", [])
-    update(guild_id, "drafted", 2)
-    update(guild_id, "ids", [])
-    update(guild_id, "names", [])
-    update(guild_id, "members", [])
-    update(guild_id, "captain1", "")
-    update(guild_id, "captain2", "")
-    update(guild_id, "using_captains", False)
+    update(guild_id, "mode", "Normal")
+    update(guild_id, "turn", 1)
 
 # Commands
 # TODO: change ids when putting into production
@@ -598,7 +582,7 @@ async def captains(ctx, captain_1: discord.Member = None, captain_2: discord.Mem
             while captain2 is None and captain2 == captain1:
                 captain2 = await getRandomMember(ctx)
 
-        # TODO: given our current code, is this check needed?
+        # TODO: given our current code, is this check needed? yes since they can pass in no captains and random is false with more than 2 in vc
         if captain1 is None or captain_2 is None:
             ctx.response.send_message("Mention two team captains!")
 
@@ -622,12 +606,18 @@ async def choose(ctx, member: discord.Member = None, random: bool = False):
     description="Clear data",
     guild=discord.Object(id=526081127643873280)
 )
-async def clearAll(ctx, clear_channels: bool = False):
+async def clearAll(ctx, clear_channels: bool = False, clear_tournament: bool = False, clear_elo: bool = False):
     await clearTeamsHelper(ctx)
 
     if clear_channels:
-        update(ctx.guild.id, "channel1", None)
-        update(ctx.guild.id, "channel2", None)
+        update(ctx.guild.id, "channel1", "")
+        update(ctx.guild.id, "channel2", "")
+
+    if clear_tournament:
+        update(ctx.guild.id, "tournament", "")
+    
+    if clear_elo:
+        update(ctx.guild.id, "elo", "")
 
     await ctx.response.send_message("Cleared!")
 
