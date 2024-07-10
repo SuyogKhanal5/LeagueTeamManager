@@ -1,5 +1,42 @@
 import discord
 
+class Player:
+    def __init__(self) -> None:
+        self.id = None
+        self.name = None
+
+    def set_id(self, id: int) -> None:
+        self.id = id
+
+    def get_id(self) -> int:
+        return self.id
+
+    def set_name(self, name: str) -> None:
+        self.name = name
+
+    def get_name(self) -> str:
+        return self.name
+    
+    # Convert from discord.Member to Player obj
+    def convertFromMember(self, member: discord.Member) -> None:
+        self.id = member.id
+        self.name = member.name
+
+    # Convert from Player obj to discord.Member
+    def convertToMember(self) -> discord.Member:
+        # Need to test
+        return discord.Member(id=self.id, name=self.name)
+    
+    def serializePlayer(self) -> str:
+        return '({}, {})'.format(self.id, self.name)
+    
+    def deserializePlayer(self, serialized: str) -> None:
+        serialized = serialized[1:-1]
+        serialized = serialized.split(', ')
+        
+        self.id = serialized[0]
+        self.name = serialized[1]
+    
 class Team:
     def __init__(self) -> None:
         self.id = None
@@ -8,28 +45,36 @@ class Team:
         self.size = 0
         self.voice_channel = None
         self.captain = None
+        self.wins = 0
+        self.losses = 0
 
-    def add_player(self, player: discord.Member) -> None:
+    def add_player(self, player: Player) -> None:
         self.players.append(player)
         self.size += 1
 
-    def remove_player(self, player: discord.Member) -> None:
+    def remove_player(self, player: Player) -> None:
         self.players.remove(player)
         self.size -= 1
 
     def set_name(self, name: str) -> None:
         self.name = name
 
-    def set_score(self, score: int) -> None:
-        self.score = score
+    def addWin(self) -> None:
+        self.wins += 1
+
+    def addLoss(self) -> None:
+        self.losses += 1
 
     def set_winner(self, winner: bool) -> None:
         self.winner = winner
 
     def set_voice_channel(self, voice_channel: discord.VoiceChannel) -> None:
-        self.voice_channel = voice_channel
+        self.voice_channel = str(voice_channel)
 
-    def set_captain(self, captain: discord.Member) -> None:
+    def set_captain(self, captain: Player) -> None:
+        if captain not in self.players:
+            raise ValueError('Captain must be a player on the team')
+        
         self.captain = captain
 
     def set_id(self, id: int) -> None:
@@ -58,6 +103,48 @@ class Team:
     
     def get_size(self) -> int:
         return self.size
+    
+    def serializeTeam(self) -> str:
+        playerString = ''
+        
+        for player in self.players:
+            serialized = player.serializePlayer()
+            
+            playerString += str(len(serialized)) + serialized
+
+        return '[{}, {}, {}, {}, {}, {}, {}, {}]'.format(self.id, self.name, self.players, self.size, self.voice_channel, self.captain.serializePlayer(), self.wins, self.losses)
+
+    def deserializeTeam(self, serialized: str) -> None:
+        serialized = serialized[1:-1]
+        serialized = serialized.split(', ')
+        
+        self.id = serialized[0]
+        self.name = serialized[1]
+
+        # convert serialized players to Player objects
+
+        newPlayerList = [] 
+
+        currentPlayer = ""
+
+        while i < len(serialized[2]):
+            tupleLen = int(serialized[2][i])
+            
+            for k in range(i+1, i+tupleLen+2):
+                currentPlayer += serialized[2][k]
+
+            player = Player()
+            player.deserializePlayer(currentPlayer)
+
+            newPlayerList.append(player)
+            i += tupleLen
+
+        self.players = newPlayerList
+        self.size = serialized[3]
+        self.voice_channel = serialized[4]
+        self.captain = serialized[5]
+        self.wins = serialized[6]
+        self.losses = serialized[7]
 
 class Match:
     def __init__(self) -> None:
