@@ -21,11 +21,6 @@ class Player:
     def convertFromMember(self, member: discord.Member) -> None:
         self.id = member.id
         self.name = member.name
-
-    # Convert from Player obj to discord.Member
-    def convertToMember(self) -> discord.Member:
-        # Need to test
-        return discord.Member(id=self.id, name=self.name)
     
     def serializePlayer(self) -> str:
         return '({}, {})'.format(self.id, self.name)
@@ -43,7 +38,7 @@ class Team:
         self.name = None
         self.players = []
         self.size = 0
-        self.voice_channel = None
+        self.voice_channel = ""
         self.captain = None
         self.wins = 0
         self.losses = 0

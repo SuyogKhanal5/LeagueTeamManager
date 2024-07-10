@@ -87,19 +87,24 @@ async def movefunc(ctx):
 
     update(ctx.guild.id, "original_channel", new_og)
 
+    team1 = Team()
+    team1.deserializeTeam(team1)
+    team2 = Team()
+    team2.deserializeTeam(team2)
+
     channel1 = discord.utils.get(ctx.guild.channels, name=channel1name)
     channel2 = discord.utils.get(ctx.guild.channels, name=channel2name)
 
     if channel1 is not None and channel2 is not None:
-        for i in team1:
-            member = discord.utils.get(ctx.guild.members, name=i)
+        for player in team1.players:
+            member = discord.utils.get(ctx.guild.members, id=player.id)
             await member.move_to(channel1)
 
-        for i in team2:
-            member = discord.utils.get(ctx.guild.members, name=i)
+        for player in team2:
+            member = discord.utils.get(ctx.guild.members, id=player.id)
             await member.move_to(channel2)
     else:
-        await ctx.response.send_message('Team Channels Not Set! Use ".setTeams" to set teams.')
+        await ctx.response.send_message('Team Channels Not Set! Use "/set-teams" to set teams.')
 
 
 # TODO: what if there are more players in the channel than team sizes?
@@ -127,14 +132,11 @@ async def randomizeTeamHelper(ctx):
 
     # seriialize both team objs
 
+    serialzedTeam1 = team1.serialize()
+    serialzedTeam2 = team2.serialize()
 
-
-
-
-    # TODO: remove names, ids, result*, teamids
-    # how are these handled now?
-    update(ctx.guild.id, "team1", team1)
-    update(ctx.guild.id, "team2", team2)
+    update(ctx.guild.id, "team1", serialzedTeam1)
+    update(ctx.guild.id, "team2", serialzedTeam2)
 
 
 # TODO: add roles parameter
@@ -517,7 +519,7 @@ async def help(ctx):
 # TODO: rename fullRandom to makeTeams
 @tree.command(
     name="make-teams",
-    description="Randomizes teams, roles, sets team channels, and moves players to their respective channels",
+    description="Create teams",
     guild=discord.Object(id=526081127643873280)
 )
 async def fullRandom(ctx, roles: bool = False, movevar: bool = True):
