@@ -23,19 +23,19 @@ class Player:
         self.name = member.name
     
     def serializePlayer(self) -> str:
-        return '({}, {})'.format(self.id, self.name)
+        return '({},{})'.format(self.id, self.name)
     
     def deserializePlayer(self, serialized: str) -> None:
-        serialized = serialized[1:-1]
-        serialized = serialized.split(', ')
+        serializedCut = serialized[1:-1]
+        serializedArr = serializedCut.split(',')
         
-        self.id = serialized[0]
-        self.name = serialized[1]
+        self.id = int(serializedArr[0])
+        self.name = serializedArr[1]
     
 class Team:
     def __init__(self) -> None:
         self.id = None
-        self.name = None
+        self.name = ''
         self.players = []
         self.size = 0
         self.voice_channel = ""
@@ -101,38 +101,54 @@ class Team:
     
     def serializeTeam(self) -> str:
         playerString = ''
+        captain = ''
         
         for player in self.players:
             serialized = player.serializePlayer()
             
             playerString += str(len(serialized)) + serialized
 
-        return '[{}, {}, {}, {}, {}, {}, {}, {}]'.format(self.id, self.name, self.players, self.size, self.voice_channel, self.captain.serializePlayer(), self.wins, self.losses)
+        if self.captain is not None:
+            captain = self.captain.serializePlayer()
+
+        return '[{}, {}, {}, {}, {}, {}, {}, {}]'.format(self.id, self.name, playerString, self.size, self.voice_channel, captain, self.wins, self.losses)
 
     def deserializeTeam(self, serialized: str) -> None:
-        serialized = serialized[1:-1]
-        serialized = serialized.split(', ')
+        serializedCut = serialized[1:-1]
+        serializedArr = serializedCut.split(', ')
         
-        self.id = serialized[0]
-        self.name = serialized[1]
+        self.id = serializedArr[0]
+        self.name = serializedArr[1]
 
         # convert serialized players to Player objects
 
         newPlayerList = [] 
 
         currentPlayer = ""
+        i = 0
 
-        while i < len(serialized[2]):
-            tupleLen = int(serialized[2][i])
-            
-            for k in range(i+1, i+tupleLen+2):
-                currentPlayer += serialized[2][k]
+        for i in range(int(serializedArr[3])):
+            # iterate till (
+            tupleLen = ''
+            j = 0 
+            while serializedArr[2][i+j] != '(':
+                tupleLen += serializedArr[2][i+j]
+                j += 1
 
-            player = Player()
-            player.deserializePlayer(currentPlayer)
+            if tupleLen != '':
+                if tupleLen[0] == ')':
+                    tupleLen = tupleLen[1:]
 
-            newPlayerList.append(player)
-            i += tupleLen
+                tupleLen = int(tupleLen)
+                
+                for k in range(i+1, i+tupleLen+2):
+                    currentPlayer += serializedArr[2][k]
+
+                player = Player()
+                player.deserializePlayer(currentPlayer[1:])
+
+                newPlayerList.append(player)
+                i += tupleLen + 1
 
         self.players = newPlayerList
         self.size = serialized[3]

@@ -6,7 +6,7 @@ import sqlite3
 import discord
 from discord import app_commands
 import TourneyClasses
-from TourneyClasses import Team, Tournament, Match
+from TourneyClasses import Team, Tournament, Match, Player
 import pickle
 
 # Get token from text file
@@ -64,14 +64,14 @@ async def on_guild_remove(ctx):
 # Helper Functions
 
 # SQL get template function
-async def get(guild_id, column):
+def get(guild_id, column):
     cursor.execute("SELECT " + column +
                    " FROM servers WHERE guildId=?", (guild_id,))
     return cursor.fetchone()[0]
 
 
 # SQL update template function
-async def update(guild_id, column, value):
+def update(guild_id, column, value):
     cursor.execute("UPDATE servers SET " + column +
                    "=? WHERE guildId=?", (value, guild_id))
     mainDB.commit()
@@ -83,24 +83,26 @@ async def movefunc(ctx):
     channel2name = get(ctx.guild.id, "channel2")
     team1 = get(ctx.guild.id, "team1")
     team2 = get(ctx.guild.id, "team2")
-    new_og = str(ctx.message.author.voice.channel)
+    new_og = str(ctx.user.voice.channel)
 
     update(ctx.guild.id, "original_channel", new_og)
 
-    team1 = Team()
-    team1.deserializeTeam(team1)
-    team2 = Team()
-    team2.deserializeTeam(team2)
+    team1Obj = Team()
+    team1Obj.set_id(1)
+    team1Obj.deserializeTeam(team1)
+    team2Obj = Team()
+    team2Obj.set_id(2)
+    team2Obj.deserializeTeam(team2)
 
     channel1 = discord.utils.get(ctx.guild.channels, name=channel1name)
     channel2 = discord.utils.get(ctx.guild.channels, name=channel2name)
 
     if channel1 is not None and channel2 is not None:
-        for player in team1.players:
+        for player in team1Obj.players:
             member = discord.utils.get(ctx.guild.members, id=player.id)
             await member.move_to(channel1)
 
-        for player in team2:
+        for player in team2Obj.players:
             member = discord.utils.get(ctx.guild.members, id=player.id)
             await member.move_to(channel2)
     else:
@@ -116,7 +118,7 @@ async def randomizeTeamHelper(ctx):
     team1 = Team()
     team2 = Team()
 
-    channel = ctx.message.author.voice.channel
+    channel = ctx.user.voice.channel
 
     for i in channel.members:
         members.append(i)
@@ -125,38 +127,41 @@ async def randomizeTeamHelper(ctx):
     np.random.shuffle(m)
 
     for i in range(len(members)):
+        newPlayer = Player()
+        newPlayer.name = m[i].name
+        newPlayer.id = m[i].id
+
         if i < len(members) / 2:
-            team1.add_player(m[i])
+            team1.add_player(newPlayer)
         else:
-            team2.add_player(m[i].name)
+            team2.add_player(newPlayer)
 
     # seriialize both team objs
 
-    serialzedTeam1 = team1.serialize()
-    serialzedTeam2 = team2.serialize()
+    serialzedTeam1 = team1.serializeTeam()
+    serialzedTeam2 = team2.serializeTeam()
 
     update(ctx.guild.id, "team1", serialzedTeam1)
     update(ctx.guild.id, "team2", serialzedTeam2)
 
 
-# TODO: add roles parameter
-async def makeEmbedString(team : Team):
-    for player in team.players:
-        teamString += player.name + "\n"
+# TODO: Identify captain
+def makeEmbedString(team : Team, roles = False):
+    teamString = ""
+    
+    if roles and len(team.players) == 5:
+        for i in range(5):
+            teamString += roles.get(i) + team.players[i].name + "\n"
+    else:
+        for player in team.players:
+            teamString += player.name + "\n"
 
     return teamString
 
 # prints teams in discord channel
-async def printEmbed(ctx, team1 : Team = None, team2 : Team = None):
-    # TODO: remove result*, playerString
+async def printEmbed(ctx, team1 : Team = None, team2 : Team = None, playersTeam = None):
     team1_embedString = makeEmbedString(team1)
     team2_embedString = makeEmbedString(team2)
-    captain1id = get(ctx.guild.id, "captain1")
-    captain2id = get(ctx.guild.id, "captain2")
-    captain1 = discord.utils.get(ctx.guild.members, id=captain1id)
-    captain2 = discord.utils.get(ctx.guild.members, id=captain2id)
-    playerString = get(ctx.guild.id, "playerString")
-    players = get(ctx.guild.id, "players")
 
     team1_embed = discord.Embed(
         title="TEAM 1", description=team1_embedString, color=discord.Color.blue()
@@ -166,73 +171,35 @@ async def printEmbed(ctx, team1 : Team = None, team2 : Team = None):
     )
 
     await ctx.response.send_message(embed=team1_embed)
-    await ctx.response.send_message(embed=team2_embed)
+    await ctx.channel.send(embed=team2_embed)
 
-    if channel is not None:
-        playerString = ""
-        for player in channel.members:
-            # TODO: remove result1 and result2
-            if (
-                player.name != captain1.name
-                and player.name != captain2.name
-                and player.name in result1
-                and player.name in result2
-            ):
-                if player.name not in players:
-                    players.append(player.name)
-                playerString += player.name + "\n"
-
-        update(ctx.guild.id, "players", players)
-        # TODO: remove playerString
-        update(ctx.guild.id, "playerString", playerString)
-
-        players_embed = discord.Embed(
-            title="PLAYERS", description=playerString, color=discord.Color.dark_purple()
+    if playersTeam != None:
+        playerString = makeEmbedString(playersTeam)
+        player_embed = discord.Embed(
+            title="PLAYERS", description=playerString, color=discord.Color.purple()
         )
-        await ctx.response.send_message(embed=players_embed)
-    else:
-        playerString = get(ctx.guild.id, "playerString")
-        players = get(ctx.guild.id, "players")
-        for player in players:
-            if (
-                player != captain1.name
-                and player != captain2.name
-                and result1.__contains__(player) == False
-                and result2.__contains__(player) == False
-            ):
-                if players.__contains__(player.name) == False:
-                    players.append(player.name)
-                playerString += player.name + "\n"
-
-        update(ctx.guild.id, "players", players)
-
-        players_embed = discord.Embed(
-            title="PLAYERS", description=playerString, color=discord.Color.dark_purple()
-        )
-        await ctx.response.send_message(embed=players_embed)
-
+        
+        await ctx.channel.send(embed=player_embed)
 
 # sets channels for teams
 # TODO: change teams to expect array of two team names
-async def setTeamHelper(ctx, teams="Team-1 Team-2"):
-    teamsList = teams.split()
-
+async def setTeamHelper(ctx, team1 = "Team 1", team2 = "Team 2"):
     guild = ctx.guild
 
-    channel1 = discord.utils.get(ctx.guild.channels, name=teamsList[0])
+    channel1 = discord.utils.get(ctx.guild.channels, name=team1)
 
     if channel1 is None:
-        await guild.create_voice_channel(name=teamsList[0])
-        channel1 = discord.utils.get(ctx.guild.channels, name=teamsList[0])
+        await guild.create_voice_channel(name=team1)
+        channel1 = discord.utils.get(ctx.guild.channels, name=team1)
 
-    channel2 = discord.utils.get(ctx.guild.channels, name=teamsList[1])
+    channel2 = discord.utils.get(ctx.guild.channels, name=team2)
 
     if channel2 is None:
-        await guild.create_voice_channel(name=teamsList[1])
-        channel2 = discord.utils.get(ctx.guild.channels, name=teamsList[1])
+        await guild.create_voice_channel(name=team2)
+        channel2 = discord.utils.get(ctx.guild.channels, name=team2)
 
-    update(guild.id, "channel1", teamsList[0])
-    update(guild.id, "channel2", teamsList[1])
+    update(guild.id, "channel1", str(team1))
+    update(guild.id, "channel2", str(team2))
 
     await ctx.response.send_message("Channels set!")
 
@@ -455,9 +422,9 @@ async def chooseHelper(ctx, member, capNum):
 
 # TODO: RENAME THIS TO SOMETHING REAL ????
 # sets up teams and moves them into respective channels
-async def all(ctx, teams):
+async def all(ctx, team1, team2):
     await printEmbed(ctx)
-    await setTeamHelper(ctx, teams)
+    await setTeamHelper(ctx, team1, team2)
     await movefunc(ctx)
 
 
@@ -494,7 +461,7 @@ async def setTeamSize(ctx, *, sizechange: int):
     guild=discord.Object(id=526081127643873280)
 )
 async def setTeamChannels(ctx, *, team1: str, team2: str):
-    await setTeamHelper(ctx, team1 + " " + team2)
+    await setTeamHelper(ctx, team1, team2)
 
 
 @tree.command(
@@ -529,7 +496,17 @@ async def fullRandom(ctx, roles: bool = False, movevar: bool = True):
         await randomizeTeamHelper(ctx)
 
     if movevar:
-        await move(ctx)
+        await movefunc(ctx)
+
+    team1 = get(ctx.guild.id, "team1")
+    team2 = get(ctx.guild.id, "team2")
+
+    team1Obj = Team()
+    team1Obj.deserializeTeam(team1)
+    team2Obj = Team()
+    team2Obj.deserializeTeam(team2)
+
+    await printEmbed(ctx, team1Obj, team2Obj)
 
 
 @tree.command(
