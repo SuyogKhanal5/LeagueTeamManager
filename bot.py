@@ -248,8 +248,6 @@ async def notify(ctx, role: discord.Role):
     team_size = helperObj.get(ctx.guild.id, "team_size")
     await ctx.response.send_message("Sent an invite for the " + str(team_size * 2) + " man!")
     
-
-
 @tree.command(
     name="roll",
     description="Roll a number between 1 and the number you provide",
