@@ -386,3 +386,18 @@ class helpers():
         self.update(guild_id, "team_size", 5)
         self.update(guild_id, "mode", "Normal")
         self.update(guild_id, "turn", 1)
+
+    async def notifyHelper(self, ctx, member: discord.Member):
+        team_size = self.get(ctx.guild.id, "team_size")
+        channel = await member.create_dm()
+        invite_channel = ctx.user.voice.channel
+        invite_link = await invite_channel.create_invite(max_uses=1, unique=True)
+        content = (
+            ctx.user.global_name
+            + " has invited you to a "
+            + str(team_size * 2)
+            + " man!\n\n"
+            + str(invite_link)
+        )
+        await channel.send(content)
+        await ctx.response.send_message("Sent an invite for the " + str(team_size * 2) + " man!")

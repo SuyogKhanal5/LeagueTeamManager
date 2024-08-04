@@ -230,19 +230,7 @@ async def clearAll(ctx, clear_channels: bool = False, clear_tournament: bool = F
     guild=discord.Object(id=526081127643873280)
 )
 async def notify(ctx, member: discord.Member):
-    team_size = helperObj.get(ctx.guild.id, "team_size")
-    channel = await member.create_dm()
-    invite_channel = ctx.message.author.voice.channel
-    invite_link = await invite_channel.create_invite(max_uses=1, unique=True)
-    content = (
-        ctx.message.author.name
-        + " has invited you to a "
-        + str(team_size * 2)
-        + " man!\n\n"
-        + str(invite_link)
-    )
-    await channel.response.send_message(content)
-    await ctx.response.send_message("Sent an invite for the " + str(team_size * 2) + " man!")
+    await helperObj.notifyHelper(ctx, member)
 
 
 @tree.command(
